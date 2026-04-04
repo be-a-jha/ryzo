@@ -2,20 +2,18 @@
 
 import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Home, Map, DollarSign, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { Home, Map, DollarSign, User, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useRyzoStore } from '@/store/ryzoStore';
 import { useRiderStore } from '@/store/riderStore';
 import { useMatchingStore } from '@/store/matchingStore';
 import {
-  MOCK_RIDER_PROFILE,
   MOCK_STANDARD_PING,
   MOCK_AGENT_LOG,
   MOCK_MATCH_DATA,
 } from '@/lib/mockData';
-import { useSpacetimeStatus, useActiveMatches } from '@/hooks/useSpacetimeDB';
+import { useSpacetimeStatus } from '@/hooks/useSpacetimeDB';
 import { cn } from '@/lib/utils';
 import type { OrderPing } from '@/types/rider';
-import api from '@/lib/api';
 
 // ── Sub-components ──
 
@@ -288,6 +286,114 @@ function BottomNav() {
   );
 }
 
+// ── Match Popup Overlay ──
+// Full-screen overlay that slides up when a match is found
+
+function MatchPopup() {
+  const riderPopupVisible = useMatchingStore((s) => s.riderPopupVisible);
+  const matchData = useMatchingStore((s) => s.matchData);
+  const acceptMatch = useMatchingStore((s) => s.acceptMatch);
+  const declineMatch = useMatchingStore((s) => s.declineMatch);
+
+  const data = matchData || MOCK_MATCH_DATA;
+
+  return (
+    <AnimatePresence>
+      {riderPopupVisible && (
+        <motion.div
+          key="match-popup-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.2 }}
+          className="absolute inset-0 z-50 flex items-end"
+          style={{ background: 'rgba(0,0,0,0.7)' }}
+        >
+          <motion.div
+            initial={{ y: '100%' }}
+            animate={{ y: 0 }}
+            exit={{ y: '100%' }}
+            transition={{ type: 'spring', damping: 28, stiffness: 350 }}
+            className="w-full bg-ryzo-surface-1 rounded-t-3xl overflow-hidden"
+            style={{ boxShadow: '0 -16px 60px rgba(252,128,25,0.25)' }}
+          >
+            {/* Orange glow bar at top */}
+            <div className="h-1 w-full bg-gradient-to-r from-transparent via-ryzo-orange to-transparent" />
+
+            {/* Handle + close */}
+            <div className="flex items-center justify-between px-5 pt-4 pb-2">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-ryzo-orange animate-pulse" />
+                <span className="text-[12px] font-bold uppercase tracking-[3px] text-ryzo-orange">
+                  New Unified Order
+                </span>
+              </div>
+              <motion.button whileTap={{ scale: 0.9 }} onClick={declineMatch}>
+                <X size={18} className="text-ryzo-text-muted" />
+              </motion.button>
+            </div>
+
+            {/* Match summary */}
+            <div className="px-5 pb-3">
+              <p className="text-[18px] font-bold text-white">
+                McDonald&apos;s + Rapido Ride
+              </p>
+              <p className="text-[13px] text-ryzo-text-secondary mt-0.5">
+                Arera Colony → BHEL → MP Nagar → Sarvadharm
+              </p>
+            </div>
+
+            {/* Stats grid */}
+            <div className="grid grid-cols-3 gap-2 px-5 pb-4">
+              <div className="bg-ryzo-surface-2 rounded-xl p-3 text-center">
+                <p className="text-[20px] font-bold text-white tabular-nums">₹{data.combinedEarnings}</p>
+                <p className="text-[10px] text-ryzo-text-secondary uppercase mt-0.5">Combined</p>
+              </div>
+              <div className="bg-ryzo-surface-2 rounded-xl p-3 text-center">
+                <p className="text-[20px] font-bold text-ryzo-success tabular-nums">{data.overlapScore}%</p>
+                <p className="text-[10px] text-ryzo-text-secondary uppercase mt-0.5">Overlap</p>
+              </div>
+              <div className="bg-ryzo-surface-2 rounded-xl p-3 text-center">
+                <p className="text-[20px] font-bold text-white tabular-nums">{data.distanceSaved} km</p>
+                <p className="text-[10px] text-ryzo-text-secondary uppercase mt-0.5">Saved</p>
+              </div>
+            </div>
+
+            {/* AI + Agent tags */}
+            <div className="flex gap-2 px-5 pb-4 flex-wrap">
+              <span className="px-2.5 py-1 rounded-lg bg-ryzo-surface-2 border border-ryzo-orange text-ryzo-orange text-[11px]">
+                🤖 AI Optimized Route
+              </span>
+              <span className="px-2.5 py-1 rounded-lg bg-ryzo-surface-2 border border-ryzo-success text-ryzo-success text-[11px]">
+                ✓ ArmorIQ Approved
+              </span>
+            </div>
+
+            {/* Buttons */}
+            <div className="flex gap-3 px-5 pb-6">
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={declineMatch}
+                className="flex-1 h-13 rounded-xl bg-ryzo-surface-2 border border-ryzo-border text-ryzo-text-secondary text-[15px] font-medium"
+              >
+                Decline
+              </motion.button>
+              <motion.button
+                whileTap={{ scale: 0.95 }}
+                onClick={acceptMatch}
+                className="flex-[2] h-13 rounded-xl bg-ryzo-orange text-black text-[15px] font-bold"
+                style={{ animation: 'pulse-orange 1.5s ease-in-out infinite' }}
+              >
+                Accept Unified Order
+              </motion.button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
 // ── Main Component ──
 
 export default function RiderDashboard() {
@@ -295,91 +401,25 @@ export default function RiderDashboard() {
   const setMatchData = useMatchingStore((s) => s.setMatchData);
   const matchStatus = useMatchingStore((s) => s.matchStatus);
   const removePing = useRiderStore((s) => s.removePing);
-  const incomingPings = useRiderStore((s) => s.incomingPings);
   const profile = useRiderStore((s) => s.profile);
   const stdbConnected = useSpacetimeStatus();
-  const stdbMatches = useActiveMatches();
 
-  // Combine store pings with the standard ping (always visible as baseline)
-  const [pings, setPings] = useState<OrderPing[]>([MOCK_STANDARD_PING]);
+  // Standard pings (non-unified) always visible as baseline
+  const [pings] = useState<OrderPing[]>([MOCK_STANDARD_PING]);
 
-  // When store receives new pings from triggerMatch, animate them in
-  useEffect(() => {
-    if (incomingPings.length > 0) {
-      setPings((prev) => {
-        const existingIds = new Set(prev.map((p) => p.id));
-        const newPings = incomingPings.filter((p) => !existingIds.has(p.id));
-        if (newPings.length === 0) return prev;
-        // Unified pings go to the top
-        return [...newPings, ...prev];
-      });
-    }
-  }, [incomingPings]);
-
-  // SpacetimeDB: when new active_match arrives, convert to a ping
-  useEffect(() => {
-    if (stdbMatches.length === 0) return;
-    const latestMatch = stdbMatches[stdbMatches.length - 1] as Record<string, unknown>;
-    const matchId = (latestMatch.matchId as string) || 'stdb-match';
-
-    setPings((prev) => {
-      if (prev.some((p) => p.id === matchId)) return prev;
-      const stdbPing: OrderPing = {
-        id: matchId,
-        type: 'unified',
-        platforms: ['SWIGGY', 'RAPIDO'],
-        badge: 'UNIFIED ORDER',
-        restaurant: "McDonald's, Arera Colony",
-        dropAddress: 'Hoshangabad Rd, BHEL',
-        distance: '4.2 km',
-        distanceLabel: 'Route',
-        earnings: `₹${(latestMatch.combinedEarnings as number) || 94}`,
-        earningsLabel: 'Combined',
-        time: '18 min',
-        timeLabel: 'Est.',
-        aiTag: '🤖 AI Optimized Route',
-        agentTag: '✓ ArmorIQ Approved',
-        expiresIn: 28,
-      };
-      return [stdbPing, ...prev];
-    });
-  }, [stdbMatches]);
-
-  const handleAccept = async (ping: OrderPing) => {
+  const handleAccept = (ping: OrderPing) => {
     if (ping.type === 'unified') {
-      try {
-        // Get match data from store (set by triggerMatch)
-        const matchData = useMatchingStore.getState().matchData;
-        
-        if (matchData?.matchId) {
-          // Call backend to accept the match
-          const response = await api.post(`/api/matching/${matchData.matchId}/accept`);
-          
-          if (response.data.match) {
-            // Navigate to order detail screen
-            navigateTo(9);
-          }
-        } else {
-          // Fallback: use mock data if no match ID
-          setMatchData(MOCK_MATCH_DATA);
-          navigateTo(9);
-        }
-      } catch (error) {
-        console.error('Failed to accept match:', error);
-        // Fallback to mock data
-        setMatchData(MOCK_MATCH_DATA);
-        navigateTo(9);
-      }
+      setMatchData(MOCK_MATCH_DATA);
+      navigateTo(9);
     }
   };
 
   const handleDecline = (pingId: string) => {
-    setPings((prev) => prev.filter((p) => p.id !== pingId));
     removePing(pingId);
   };
 
   return (
-    <div className="flex flex-col h-full bg-ryzo-black">
+    <div className="flex flex-col h-full bg-ryzo-black relative">
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pt-3 pb-4">
         {/* Header */}
@@ -400,7 +440,7 @@ export default function RiderDashboard() {
           <OnlineToggle />
         </div>
 
-        {/* Section label + searching indicator */}
+        {/* Section label */}
         <div className="flex items-center justify-between mt-5 mb-3">
           <span className="text-[14px] font-medium text-white">INCOMING ORDERS</span>
           <span className="w-2 h-2 rounded-full bg-ryzo-orange animate-pulse" />
@@ -430,7 +470,7 @@ export default function RiderDashboard() {
           )}
         </AnimatePresence>
 
-        {/* Order pings */}
+        {/* Standard order pings (always visible) */}
         <div className="flex flex-col gap-3">
           <AnimatePresence>
             {pings.map((ping) => (
@@ -463,6 +503,9 @@ export default function RiderDashboard() {
 
       {/* Bottom nav */}
       <BottomNav />
+
+      {/* Match Popup Overlay — slides up on top of everything */}
+      <MatchPopup />
     </div>
   );
 }

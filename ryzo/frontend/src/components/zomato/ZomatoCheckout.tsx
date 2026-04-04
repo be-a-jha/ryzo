@@ -1,7 +1,7 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, ChevronRight, Pencil, Zap } from 'lucide-react';
+import { ArrowLeft, Pencil, Zap, Check } from 'lucide-react';
 import { useMatchingStore } from '@/store/matchingStore';
 import {
   ZOMATO_ORDER_ITEMS,
@@ -99,6 +99,7 @@ function PricingBreakdown() {
 
 function RyzoFlexibleCard() {
   const triggerMatch = useMatchingStore((s) => s.triggerMatch);
+  const isTriggered = useMatchingStore((s) => s.zomatoFlexibleTriggered);
 
   return (
     <motion.div
@@ -136,14 +137,29 @@ function RyzoFlexibleCard() {
         </div>
       </div>
 
-      {/* Flexible CTA */}
-      <motion.button
-        whileTap={{ scale: 0.97 }}
-        onClick={() => triggerMatch('zomato')}
-        className="w-full h-13 rounded-xl bg-[#FC8019] text-black text-[15px] font-bold mt-3"
-      >
-        Order with Flexible Delivery
-      </motion.button>
+      {/* Flexible CTA — changes state after click */}
+      <AnimatePresence mode="wait">
+        {isTriggered ? (
+          <motion.div
+            key="confirmed"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="w-full h-13 rounded-xl bg-[#22C55E] text-white text-[15px] font-bold mt-3 flex items-center justify-center gap-2"
+          >
+            <Check size={18} strokeWidth={3} />
+            Flexible Order Placed
+          </motion.div>
+        ) : (
+          <motion.button
+            key="cta"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => triggerMatch('zomato')}
+            className="w-full h-13 rounded-xl bg-[#FC8019] text-black text-[15px] font-bold mt-3"
+          >
+            Order with Flexible Delivery
+          </motion.button>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
@@ -155,7 +171,7 @@ function MatchNotification() {
   return (
     <div className="absolute top-1 left-2 right-2 z-50 pointer-events-none">
       <AnimatePresence>
-        {matchStatus === 'searching' && !notification && (
+        {matchStatus === 'searching' && (
           <motion.div
             key="zomato-searching"
             initial={{ y: -40, opacity: 0 }}
@@ -165,10 +181,13 @@ function MatchNotification() {
             className="bg-[#111111] border border-[#FC8019] rounded-xl px-4 py-3 shadow-lg flex items-center gap-2"
           >
             <div className="w-4 h-4 border-2 border-[#FC8019] border-t-transparent rounded-full animate-spin" />
-            <p className="text-[13px] font-medium text-[#FC8019]">Finding a flexible rider...</p>
+            <div>
+              <p className="text-[13px] font-medium text-[#FC8019]">Finding a flexible rider...</p>
+              <p className="text-[10px] text-[#555555] mt-0.5">AI analyzing route overlap</p>
+            </div>
           </motion.div>
         )}
-        {notification && (
+        {notification && matchStatus !== 'searching' && (
           <motion.div
             key="zomato-notif"
             initial={{ y: -40, opacity: 0 }}

@@ -1,14 +1,52 @@
 'use client';
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2 } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { useRiderStore } from '@/store/riderStore';
-import { MOCK_NAVIGATION_STOPS } from '@/lib/mockData';
+import { MOCK_NAVIGATION_STOPS, VOICE_SCRIPTS } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import type { OrderStop } from '@/types/order';
 import MapView from '@/components/shared/MapView';
-import api from '@/lib/api';
+
+// ── Voice engine — browser SpeechSynthesis, zero backend dependency ──
+
+function useBrowserVoice() {
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+
+  const speak = useCallback((text: string) => {
+    if (typeof window === 'undefined') return;
+
+    // Cancel any current speech
+    window.speechSynthesis?.cancel();
+
+    if (!('speechSynthesis' in window)) return;
+
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.95;
+    utterance.pitch = 1.0;
+    utterance.volume = 1.0;
+
+    // Try to pick a good English voice
+    const voices = window.speechSynthesis.getVoices();
+    const preferred = voices.find(
+      (v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('google'),
+    ) || voices.find((v) => v.lang.startsWith('en-'));
+    if (preferred) {
+      utterance.voice = preferred;
+    }
+
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+  }, []);
+
+  const stop = useCallback(() => {
+    window.speechSynthesis?.cancel();
+    utteranceRef.current = null;
+  }, []);
+
+  return { speak, stop };
+}
 
 // ── Waveform bars ──
 
@@ -42,23 +80,28 @@ function WaveformBars({ active }: { active: boolean }) {
 
 // ── Voice Banner ──
 
-function VoiceBanner() {
+function VoiceBanner({ onToggleMute, muted }: { onToggleMute: () => void; muted: boolean }) {
   const voiceActive = useRiderStore((s) => s.voiceActive);
   const instruction = useRiderStore((s) => s.currentVoiceInstruction);
 
   return (
-    <div
-      className="bg-ryzo-surface-1 border border-ryzo-orange rounded-2xl p-4 flex items-center gap-3"
-    >
-      <WaveformBars active={voiceActive} />
+    <div className="bg-ryzo-surface-1 border border-ryzo-orange rounded-2xl p-4 flex items-center gap-3">
+      <WaveformBars active={voiceActive && !muted} />
       <div className="flex-1 min-w-0">
-        <p className="text-[14px] font-bold text-white">🔊 Voice Navigation Active</p>
+        <p className="text-[14px] font-bold text-white">
+          {muted ? '🔇 Voice Muted' : '🔊 Voice Navigation Active'}
+        </p>
         <p className="text-[13px] text-ryzo-orange mt-0.5 truncate">
-          {instruction || 'Turn right on Hoshangabad Road in 200m'}
+          {instruction || 'Preparing navigation...'}
         </p>
       </div>
-      <Volume2 size={20} className="flex-shrink-0 text-ryzo-orange" />
-      <span className="absolute bottom-1 right-3 text-[9px] text-ryzo-text-muted">ElevenLabs</span>
+      <motion.button whileTap={{ scale: 0.9 }} onClick={onToggleMute}>
+        {muted ? (
+          <VolumeX size={20} className="flex-shrink-0 text-ryzo-text-muted" />
+        ) : (
+          <Volume2 size={20} className="flex-shrink-0 text-ryzo-orange" />
+        )}
+      </motion.button>
     </div>
   );
 }
@@ -66,13 +109,12 @@ function VoiceBanner() {
 // ── Map with Google Maps ──
 
 function NavigationMap({ stops }: { stops: OrderStop[] }) {
-  // Mock rider position - in real app this would come from GPS
   const riderPosition = { lat: 23.2400, lng: 77.4300 };
 
   return (
     <div className="w-full h-[200px] bg-ryzo-surface-2 border-b border-ryzo-border relative">
-      <MapView 
-        variant="navigation" 
+      <MapView
+        variant="navigation"
         riderPosition={riderPosition}
         stops={stops}
       />
@@ -105,7 +147,7 @@ function StopsStepper({ stops }: { stops: OrderStop[] }) {
                 'w-6 h-6 rounded-full flex items-center justify-center border-2',
                 isDone && 'bg-ryzo-success border-ryzo-success',
                 isCurrent && 'bg-ryzo-orange border-ryzo-orange',
-                !isDone && !isCurrent && 'bg-ryzo-text-disabled border-ryzo-text-muted'
+                !isDone && !isCurrent && 'bg-ryzo-text-disabled border-ryzo-text-muted',
               )}
             >
               {isDone ? (
@@ -121,7 +163,7 @@ function StopsStepper({ stops }: { stops: OrderStop[] }) {
                 'text-[11px] mt-1.5 text-center leading-tight',
                 isDone && 'text-ryzo-text-muted line-through',
                 isCurrent && 'text-white font-bold',
-                !isDone && !isCurrent && 'text-ryzo-text-muted'
+                !isDone && !isCurrent && 'text-ryzo-text-muted',
               )}
             >
               {stop.name}
@@ -131,7 +173,7 @@ function StopsStepper({ stops }: { stops: OrderStop[] }) {
                 'text-[10px] text-center',
                 isDone && 'text-ryzo-text-muted line-through',
                 isCurrent && 'text-ryzo-text-secondary',
-                !isDone && !isCurrent && 'text-ryzo-text-disabled'
+                !isDone && !isCurrent && 'text-ryzo-text-disabled',
               )}
             >
               {stopLabels[stop.name] || stop.type}
@@ -151,59 +193,96 @@ export default function ActiveNavigation() {
   const setNavigationStops = useRiderStore((s) => s.setNavigationStops);
   const setVoiceActive = useRiderStore((s) => s.setVoiceActive);
   const setVoiceInstruction = useRiderStore((s) => s.setVoiceInstruction);
+  const currentStopIndex = useRiderStore((s) => s.currentStopIndex);
+
+  const { speak, stop: stopSpeech } = useBrowserVoice();
+  const mutedRef = useRef(false);
+  const hasMountedRef = useRef(false);
 
   const stops = navigationStops.length > 0 ? navigationStops : MOCK_NAVIGATION_STOPS;
   const currentStop = stops.find((s) => s.status === 'current');
-  const currentIndex = stops.findIndex((s) => s.status === 'current');
+  const allDone = stops.every((s) => s.status === 'done');
 
+  // Initialize stops + play first voice instruction on mount
   useEffect(() => {
     if (navigationStops.length === 0) {
       setNavigationStops(MOCK_NAVIGATION_STOPS);
     }
     setVoiceActive(true);
-    
-    // Call backend to generate voice navigation
-    const playVoiceNavigation = async () => {
-      try {
-        const response = await api.post('/api/voice/generate', {
-          type: 'navigation',
-        });
-        
-        if (response.headers['content-type']?.includes('audio/mpeg')) {
-          // Audio returned - play it
-          const audioBlob = new Blob([response.data], { type: 'audio/mpeg' });
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          audio.play().catch(err => console.error('Audio playback failed:', err));
-          
-          // Get script from header
-          const script = decodeURIComponent(response.headers['x-voice-script'] || '');
-          setVoiceInstruction(script || 'Turn right on Hoshangabad Road in 200m');
-        } else if (response.data.script) {
-          // Fallback: text script returned
-          setVoiceInstruction(response.data.script);
-        }
-      } catch (error) {
-        console.error('Voice generation failed:', error);
-        // Fallback to default instruction
-        setVoiceInstruction('Turn right on Hoshangabad Road in 200m');
-      }
-    };
-    
-    playVoiceNavigation();
-  }, [navigationStops.length, setNavigationStops, setVoiceActive, setVoiceInstruction]);
 
-  const allDone = stops.every((s) => s.status === 'done');
+    // Small delay so voices list is loaded
+    const timer = setTimeout(() => {
+      if (!hasMountedRef.current) {
+        hasMountedRef.current = true;
+        const firstScript = VOICE_SCRIPTS.turnByTurn[0];
+        setVoiceInstruction(firstScript);
+        if (!mutedRef.current) {
+          speak(firstScript);
+        }
+      }
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      stopSpeech();
+      setVoiceActive(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // When stop index changes, speak the next turn-by-turn instruction
+  useEffect(() => {
+    if (!hasMountedRef.current) return;
+
+    const script = VOICE_SCRIPTS.turnByTurn[currentStopIndex];
+    if (script) {
+      setVoiceInstruction(script);
+      if (!mutedRef.current) {
+        speak(script);
+      }
+    }
+  }, [currentStopIndex, setVoiceInstruction, speak]);
+
+  // When all done, speak completion
+  useEffect(() => {
+    if (allDone && hasMountedRef.current) {
+      const doneScript = 'All deliveries complete. Great job! You earned 94 rupees combined.';
+      setVoiceInstruction(doneScript);
+      if (!mutedRef.current) {
+        speak(doneScript);
+      }
+      setVoiceActive(false);
+    }
+  }, [allDone, setVoiceInstruction, setVoiceActive, speak]);
 
   const handleMarkDelivered = () => {
-    advanceStop();
+    // Speak arrival script before advancing
+    const arrivalScript = VOICE_SCRIPTS.stopArrival[currentStopIndex];
+    if (arrivalScript && !mutedRef.current) {
+      speak(arrivalScript);
+    }
+
+    // Advance after a tiny delay so arrival audio starts
+    setTimeout(() => {
+      advanceStop();
+    }, 300);
+  };
+
+  const handleToggleMute = () => {
+    mutedRef.current = !mutedRef.current;
+    if (mutedRef.current) {
+      stopSpeech();
+      setVoiceActive(false);
+    } else {
+      setVoiceActive(true);
+    }
   };
 
   return (
     <div className="flex flex-col h-full bg-ryzo-black">
       {/* Voice banner */}
-      <div className="px-4 pt-3 relative">
-        <VoiceBanner />
+      <div className="px-4 pt-3">
+        <VoiceBanner onToggleMute={handleToggleMute} muted={mutedRef.current} />
       </div>
 
       {/* Map */}

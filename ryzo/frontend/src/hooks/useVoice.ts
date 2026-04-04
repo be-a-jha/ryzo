@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useCallback, useRef } from 'react';
-import api from '@/lib/api';
 
 type VoiceCommandType = 'match' | 'navigation' | 'arrival' | 'fallback';
 
@@ -16,73 +15,50 @@ const FALLBACK_SCRIPTS: Record<VoiceCommandType, string> = {
 export function useVoice() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentScript, setCurrentScript] = useState('');
-  const audioContextRef = useRef<AudioContext | null>(null);
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
 
   const stop = useCallback(() => {
-    if (sourceRef.current) {
-      try {
-        sourceRef.current.stop();
-      } catch {
-        // Already stopped
-      }
-      sourceRef.current = null;
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
     }
+    utteranceRef.current = null;
     setIsPlaying(false);
   }, []);
 
   const playVoice = useCallback(
-    async (type: VoiceCommandType, customText?: string) => {
+    (type: VoiceCommandType, customText?: string) => {
       try {
-        // Stop any currently playing audio
+        // Stop any current playback
         stop();
+
+        const text = customText || FALLBACK_SCRIPTS[type];
         setIsPlaying(true);
-        setCurrentScript(customText || FALLBACK_SCRIPTS[type]);
+        setCurrentScript(text);
 
-        // Try to get audio from backend (ElevenLabs)
-        try {
-          const response = await api.post(
-            '/api/voice/generate',
-            { type, text: customText },
-            { responseType: 'arraybuffer', timeout: 5000 }
-          );
+        // Use browser SpeechSynthesis — works everywhere, zero network dependency
+        if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.rate = 0.95;
+          utterance.pitch = 1.0;
+          utterance.volume = 1.0;
 
-          // Check if we got audio (Content-Type: audio/mpeg) or JSON fallback
-          const contentType = response.headers['content-type'] || '';
-          if (contentType.includes('audio')) {
-            // Play audio via Web Audio API
-            if (!audioContextRef.current) {
-              audioContextRef.current = new AudioContext();
-            }
-            const audioContext = audioContextRef.current;
-            const audioBuffer = await audioContext.decodeAudioData(response.data as ArrayBuffer);
-            const source = audioContext.createBufferSource();
-            source.buffer = audioBuffer;
-            source.connect(audioContext.destination);
-            source.onended = () => {
-              setIsPlaying(false);
-              sourceRef.current = null;
-            };
-            sourceRef.current = source;
-            source.start(0);
-            return;
+          // Pick a good English voice if available
+          const voices = window.speechSynthesis.getVoices();
+          const preferred =
+            voices.find(
+              (v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('google'),
+            ) || voices.find((v) => v.lang.startsWith('en-'));
+          if (preferred) {
+            utterance.voice = preferred;
           }
-        } catch {
-          // Backend not available — use browser TTS fallback
-        }
 
-        // Fallback: use browser's built-in SpeechSynthesis
-        if ('speechSynthesis' in window) {
-          const utterance = new SpeechSynthesisUtterance(
-            customText || FALLBACK_SCRIPTS[type]
-          );
-          utterance.rate = 0.9;
-          utterance.pitch = 1;
           utterance.onend = () => setIsPlaying(false);
           utterance.onerror = () => setIsPlaying(false);
+
+          utteranceRef.current = utterance;
           window.speechSynthesis.speak(utterance);
         } else {
-          // No TTS available — just simulate playback for demo
+          // No TTS at all — simulate playback duration for demo
           setTimeout(() => setIsPlaying(false), 3000);
         }
       } catch (error) {
@@ -90,7 +66,7 @@ export function useVoice() {
         setIsPlaying(false);
       }
     },
-    [stop]
+    [stop],
   );
 
   return { playVoice, isPlaying, currentScript, stop };

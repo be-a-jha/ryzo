@@ -400,12 +400,20 @@ export default function RiderDashboard() {
   const navigateTo = useRyzoStore((s) => s.navigateTo);
   const setMatchData = useMatchingStore((s) => s.setMatchData);
   const matchStatus = useMatchingStore((s) => s.matchStatus);
+  const showRiderPopup = useMatchingStore((s) => s.showRiderPopup);
   const removePing = useRiderStore((s) => s.removePing);
   const profile = useRiderStore((s) => s.profile);
   const stdbConnected = useSpacetimeStatus();
 
   // Standard pings (non-unified) always visible as baseline
   const [pings] = useState<OrderPing[]>([MOCK_STANDARD_PING]);
+
+  // When rider reaches this screen, activate any pending match popup + sound
+  useEffect(() => {
+    showRiderPopup();
+  // Only run on mount — showRiderPopup is stable (store action ref)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleAccept = (ping: OrderPing) => {
     if (ping.type === 'unified') {

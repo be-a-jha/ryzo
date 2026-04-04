@@ -21,9 +21,13 @@ interface MatchingState {
   rapidoNotification: string | null;
   /** Whether the rider popup is showing */
   riderPopupVisible: boolean;
+  /** Match is ready but rider hasn't reached Screen 8 yet — queued */
+  pendingRiderAlert: boolean;
 
   /** Mark a platform as flexible-ordered (does NOT trigger match alone) */
   triggerMatch: (source: 'zomato' | 'rapido') => void;
+  /** Called by RiderDashboard on mount — activates any queued popup + plays sound */
+  showRiderPopup: () => void;
   /** Set match data from backend response */
   setMatchData: (data: MatchData) => void;
   /** Update match status */
@@ -51,6 +55,7 @@ const initialState = {
   zomatoNotification: null as string | null,
   rapidoNotification: null as string | null,
   riderPopupVisible: false,
+  pendingRiderAlert: false,
 };
 
 /** Play a short notification beep using Web Audio API */
@@ -148,6 +153,15 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
     }
   },
 
+  showRiderPopup: () => {
+    const { pendingRiderAlert, matchStatus } = get();
+    // Only activate if there is a queued match and it hasn't been acted on
+    if (pendingRiderAlert && matchStatus === 'matched') {
+      set({ riderPopupVisible: true, pendingRiderAlert: false });
+      playNotificationSound();
+    }
+  },
+
   acceptMatch: () => {
     set({
       matchStatus: 'accepted',
@@ -177,6 +191,7 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
       matchStatus: 'idle',
       matchData: null,
       riderPopupVisible: false,
+      pendingRiderAlert: false,
       agentLog: [],
       zomatoFlexibleTriggered: false,
       rapidoFlexibleTriggered: false,
@@ -217,21 +232,24 @@ function fireBothMatched(
       matchStatus: 'matched',
       matchData: MOCK_MATCH_DATA,
       agentLog: MOCK_AGENT_LOG,
-      riderPopupVisible: true,
+      // riderPopupVisible starts false — only becomes true once the rider
+      // is actually on Screen 8 (RiderDashboard mounts and calls showRiderPopup)
+      riderPopupVisible: false,
       zomatoNotification: null,
       rapidoNotification: null,
+      pendingRiderAlert: true, // queues the popup for when rider reaches dashboard
     });
 
     // Inject unified ping into rider store
     useRiderStore.getState().addPing(MOCK_UNIFIED_PING);
 
-    // Ensure RYZO center phone is on rider dashboard
+    // Only play sound if rider is already on the dashboard (Screen 8)
     const ryzoScreen = useRyzoStore.getState().currentScreen;
-    if (ryzoScreen < 8) {
-      useRyzoStore.getState().navigateTo(8);
+    if (ryzoScreen === 8) {
+      // Rider is already logged in and on dashboard — show popup + sound immediately
+      set({ riderPopupVisible: true, pendingRiderAlert: false });
+      playNotificationSound();
     }
-
-    // Play notification sound for the rider
-    playNotificationSound();
+    // Otherwise: pendingRiderAlert stays true. RiderDashboard will pick it up on mount.
   }, 1500);
 }

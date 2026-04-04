@@ -1,0 +1,468 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Home, Map, DollarSign, User, ChevronDown, ChevronUp } from 'lucide-react';
+import { useRyzoStore } from '@/store/ryzoStore';
+import { useRiderStore } from '@/store/riderStore';
+import { useMatchingStore } from '@/store/matchingStore';
+import {
+  MOCK_RIDER_PROFILE,
+  MOCK_STANDARD_PING,
+  MOCK_AGENT_LOG,
+  MOCK_MATCH_DATA,
+} from '@/lib/mockData';
+import { useSpacetimeStatus, useActiveMatches } from '@/hooks/useSpacetimeDB';
+import { cn } from '@/lib/utils';
+import type { OrderPing } from '@/types/rider';
+import api from '@/lib/api';
+
+// ── Sub-components ──
+
+function EarningsCard() {
+  const profile = useRiderStore((s) => s.profile);
+  return (
+    <div className="bg-ryzo-surface-1 border border-ryzo-border rounded-2xl p-4">
+      <div className="flex justify-between items-start">
+        <div>
+          <p className="text-[12px] text-ryzo-text-secondary">Today&apos;s Earnings</p>
+          <p className="text-[28px] font-bold text-white tabular-nums">₹{profile.todayEarnings}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-[12px] text-ryzo-text-secondary">Orders</p>
+          <p className="text-[28px] font-bold text-white tabular-nums">{profile.todayOrders}</p>
+        </div>
+      </div>
+      <div className="mt-3">
+        <div className="w-full h-1 bg-ryzo-surface-2 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-ryzo-orange rounded-full transition-all duration-500"
+            style={{ width: `${profile.goalPercent}%` }}
+          />
+        </div>
+        <p className="text-[11px] text-ryzo-text-secondary mt-1.5">{profile.goalPercent}% of daily goal</p>
+      </div>
+    </div>
+  );
+}
+
+function OnlineToggle() {
+  const profile = useRiderStore((s) => s.profile);
+  const toggleStatus = useRiderStore((s) => s.toggleStatus);
+  const isOnline = profile.status === 'online';
+  return (
+    <motion.button
+      whileTap={{ scale: 0.97 }}
+      onClick={toggleStatus}
+      className="w-full bg-ryzo-surface-1 border border-ryzo-border rounded-2xl p-2 flex"
+    >
+      <div
+        className={cn(
+          'flex-1 py-2.5 rounded-xl text-[13px] font-bold text-center transition-all duration-200',
+          isOnline ? 'bg-ryzo-surface-2 text-ryzo-success' : 'text-ryzo-text-muted'
+        )}
+        style={isOnline ? { boxShadow: '0 0 12px rgba(34,197,94,0.15)' } : undefined}
+      >
+        ONLINE
+      </div>
+      <div
+        className={cn(
+          'flex-1 py-2.5 rounded-xl text-[13px] font-bold text-center transition-all duration-200',
+          !isOnline ? 'bg-ryzo-surface-2 text-ryzo-error' : 'text-ryzo-text-muted'
+        )}
+      >
+        GO OFFLINE
+      </div>
+    </motion.button>
+  );
+}
+
+function PlatformChip({ name, color }: { name: string; color: string }) {
+  return (
+    <span
+      className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-[0.5px] border"
+      style={{
+        color,
+        borderColor: color,
+        backgroundColor: color + '1A',
+      }}
+    >
+      {name}
+    </span>
+  );
+}
+
+function StatsRow({ distance, earnings, time, ping }: {
+  distance: string; earnings: string; time: string; ping: OrderPing;
+}) {
+  return (
+    <div className="flex gap-2 mt-3">
+      <div className="flex-1 text-center">
+        <p className="text-[16px] font-bold text-white tabular-nums">{distance}</p>
+        <p className="text-[11px] text-ryzo-text-secondary uppercase">{ping.distanceLabel}</p>
+      </div>
+      <div className="flex-1 text-center">
+        <p className="text-[16px] font-bold text-white tabular-nums">{earnings}</p>
+        <p className="text-[11px] text-ryzo-text-secondary uppercase">{ping.earningsLabel}</p>
+      </div>
+      <div className="flex-1 text-center">
+        <p className="text-[16px] font-bold text-white tabular-nums">{time}</p>
+        <p className="text-[11px] text-ryzo-text-secondary uppercase">{ping.timeLabel}</p>
+      </div>
+    </div>
+  );
+}
+
+function OrderPingCard({ ping, onAccept, onDecline }: {
+  ping: OrderPing;
+  onAccept: () => void;
+  onDecline: () => void;
+}) {
+  const isUnified = ping.type === 'unified';
+  const [timer, setTimer] = useState(ping.expiresIn);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimer((t) => (t > 0 ? t - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const minutes = Math.floor(timer / 60);
+  const seconds = timer % 60;
+
+  const platformColors: Record<string, string> = {
+    SWIGGY: '#FC8019',
+    RAPIDO: '#1A6FE8',
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, x: -100 }}
+      className={cn(
+        'bg-ryzo-surface-1 rounded-2xl p-4',
+        isUnified ? 'border-2 border-ryzo-orange' : 'border border-ryzo-border'
+      )}
+      style={isUnified ? { animation: 'pulse-orange 1.5s ease-in-out infinite' } : undefined}
+    >
+      {/* Platform chips + badge */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {ping.platforms.map((p) => (
+          <PlatformChip key={p} name={p} color={platformColors[p] || '#888888'} />
+        ))}
+        {isUnified && ping.badge && (
+          <span className="text-[11px] font-bold uppercase tracking-[2px] text-ryzo-orange ml-auto">
+            {ping.badge}
+          </span>
+        )}
+      </div>
+
+      {/* Restaurant + drop */}
+      <p className="text-[15px] font-bold text-white mt-2.5">{ping.restaurant}</p>
+      <p className="text-[13px] text-ryzo-text-secondary">{ping.dropAddress}</p>
+
+      {/* Stats row */}
+      <StatsRow distance={ping.distance} earnings={ping.earnings} time={ping.time} ping={ping} />
+
+      {/* AI + Agent tags (unified only) */}
+      {isUnified && (
+        <div className="flex gap-2 mt-3 flex-wrap">
+          {ping.aiTag && (
+            <span className="px-2.5 py-1 rounded-lg bg-ryzo-surface-2 border border-ryzo-orange text-ryzo-orange text-[11px]">
+              {ping.aiTag}
+            </span>
+          )}
+          {ping.agentTag && (
+            <span className="px-2.5 py-1 rounded-lg bg-ryzo-surface-2 border border-ryzo-success text-ryzo-success text-[11px]">
+              {ping.agentTag}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div className="flex gap-2 mt-4">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={onDecline}
+          className="flex-1 h-11 rounded-xl bg-ryzo-surface-2 border border-ryzo-border text-ryzo-text-secondary text-[14px]"
+        >
+          Decline
+        </motion.button>
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={onAccept}
+          className="flex-1 h-11 rounded-xl bg-ryzo-orange text-black text-[14px] font-bold"
+        >
+          Accept
+        </motion.button>
+      </div>
+
+      {/* Timer */}
+      <p className="text-[12px] text-ryzo-text-secondary text-right mt-2 tabular-nums">
+        Expires in {minutes}:{seconds.toString().padStart(2, '0')}
+      </p>
+    </motion.div>
+  );
+}
+
+function AgentDecisionLog() {
+  const [expanded, setExpanded] = useState(false);
+  const agentLog = useMatchingStore((s) => s.agentLog);
+  const log = agentLog.length > 0 ? agentLog : MOCK_AGENT_LOG;
+
+  return (
+    <div className="mt-3">
+      <motion.button
+        whileTap={{ scale: 0.97 }}
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-2 text-[13px] text-ryzo-text-secondary"
+      >
+        {expanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        View ArmorIQ Decision Log
+      </motion.button>
+      <AnimatePresence>
+        {expanded && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="flex flex-col gap-2 mt-2">
+              {log.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="text-[12px] font-mono flex items-start gap-2 px-2 py-1.5 bg-ryzo-surface-2 rounded-lg"
+                >
+                  <span className={entry.action === 'MATCH_APPROVED' ? 'text-ryzo-success' : 'text-ryzo-error'}>
+                    {entry.action === 'MATCH_APPROVED' ? '✅' : '❌'}
+                  </span>
+                  <span className={entry.action === 'MATCH_APPROVED' ? 'text-ryzo-success' : 'text-ryzo-error'}>
+                    {entry.action === 'MATCH_APPROVED' ? 'APPROVED' : 'BLOCKED'}
+                  </span>
+                  <span className="text-ryzo-text-muted">|</span>
+                  <span className="text-ryzo-text-secondary">{entry.reason}</span>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+function BottomNav() {
+  const tabs = [
+    { icon: Home, label: 'Home', active: true },
+    { icon: Map, label: 'Map', active: false },
+    { icon: DollarSign, label: 'Earnings', active: false },
+    { icon: User, label: 'Profile', active: false },
+  ] as const;
+
+  return (
+    <div className="flex-shrink-0 bg-ryzo-surface-3 border-t border-ryzo-border-subtle">
+      <div className="flex items-center justify-around h-16">
+        {tabs.map((tab) => (
+          <button key={tab.label} className="flex flex-col items-center gap-1">
+            <tab.icon
+              size={20}
+              className={tab.active ? 'text-ryzo-orange' : 'text-ryzo-text-muted'}
+            />
+            <span
+              className={cn(
+                'text-[10px] font-medium',
+                tab.active ? 'text-ryzo-orange' : 'text-ryzo-text-muted'
+              )}
+            >
+              {tab.label}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Main Component ──
+
+export default function RiderDashboard() {
+  const navigateTo = useRyzoStore((s) => s.navigateTo);
+  const setMatchData = useMatchingStore((s) => s.setMatchData);
+  const matchStatus = useMatchingStore((s) => s.matchStatus);
+  const removePing = useRiderStore((s) => s.removePing);
+  const incomingPings = useRiderStore((s) => s.incomingPings);
+  const profile = useRiderStore((s) => s.profile);
+  const stdbConnected = useSpacetimeStatus();
+  const stdbMatches = useActiveMatches();
+
+  // Combine store pings with the standard ping (always visible as baseline)
+  const [pings, setPings] = useState<OrderPing[]>([MOCK_STANDARD_PING]);
+
+  // When store receives new pings from triggerMatch, animate them in
+  useEffect(() => {
+    if (incomingPings.length > 0) {
+      setPings((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newPings = incomingPings.filter((p) => !existingIds.has(p.id));
+        if (newPings.length === 0) return prev;
+        // Unified pings go to the top
+        return [...newPings, ...prev];
+      });
+    }
+  }, [incomingPings]);
+
+  // SpacetimeDB: when new active_match arrives, convert to a ping
+  useEffect(() => {
+    if (stdbMatches.length === 0) return;
+    const latestMatch = stdbMatches[stdbMatches.length - 1] as Record<string, unknown>;
+    const matchId = (latestMatch.matchId as string) || 'stdb-match';
+
+    setPings((prev) => {
+      if (prev.some((p) => p.id === matchId)) return prev;
+      const stdbPing: OrderPing = {
+        id: matchId,
+        type: 'unified',
+        platforms: ['SWIGGY', 'RAPIDO'],
+        badge: 'UNIFIED ORDER',
+        restaurant: "McDonald's, Arera Colony",
+        dropAddress: 'Hoshangabad Rd, BHEL',
+        distance: '4.2 km',
+        distanceLabel: 'Route',
+        earnings: `₹${(latestMatch.combinedEarnings as number) || 94}`,
+        earningsLabel: 'Combined',
+        time: '18 min',
+        timeLabel: 'Est.',
+        aiTag: '🤖 AI Optimized Route',
+        agentTag: '✓ ArmorIQ Approved',
+        expiresIn: 28,
+      };
+      return [stdbPing, ...prev];
+    });
+  }, [stdbMatches]);
+
+  const handleAccept = async (ping: OrderPing) => {
+    if (ping.type === 'unified') {
+      try {
+        // Get match data from store (set by triggerMatch)
+        const matchData = useMatchingStore.getState().matchData;
+        
+        if (matchData?.matchId) {
+          // Call backend to accept the match
+          const response = await api.post(`/api/matching/${matchData.matchId}/accept`);
+          
+          if (response.data.match) {
+            // Navigate to order detail screen
+            navigateTo(9);
+          }
+        } else {
+          // Fallback: use mock data if no match ID
+          setMatchData(MOCK_MATCH_DATA);
+          navigateTo(9);
+        }
+      } catch (error) {
+        console.error('Failed to accept match:', error);
+        // Fallback to mock data
+        setMatchData(MOCK_MATCH_DATA);
+        navigateTo(9);
+      }
+    }
+  };
+
+  const handleDecline = (pingId: string) => {
+    setPings((prev) => prev.filter((p) => p.id !== pingId));
+    removePing(pingId);
+  };
+
+  return (
+    <div className="flex flex-col h-full bg-ryzo-black">
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pt-3 pb-4">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-[18px] font-bold text-white">
+            Good morning, {profile.name.split(' ')[0]} 👋
+          </h2>
+          <div className="w-10 h-10 rounded-full bg-ryzo-surface-2 border-2 border-ryzo-orange flex items-center justify-center">
+            <span className="text-[13px] font-bold text-white">{profile.initials}</span>
+          </div>
+        </div>
+
+        {/* Earnings */}
+        <EarningsCard />
+
+        {/* Online toggle */}
+        <div className="mt-3">
+          <OnlineToggle />
+        </div>
+
+        {/* Section label + searching indicator */}
+        <div className="flex items-center justify-between mt-5 mb-3">
+          <span className="text-[14px] font-medium text-white">INCOMING ORDERS</span>
+          <span className="w-2 h-2 rounded-full bg-ryzo-orange animate-pulse" />
+        </div>
+
+        {/* Matching in progress banner */}
+        <AnimatePresence>
+          {matchStatus === 'searching' && (
+            <motion.div
+              key="searching-banner"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.3 }}
+              className="mb-3 overflow-hidden"
+            >
+              <div className="bg-ryzo-surface-1 border border-ryzo-orange rounded-2xl p-4 flex items-center gap-3">
+                <div className="w-6 h-6 border-2 border-ryzo-orange border-t-transparent rounded-full animate-spin" />
+                <div>
+                  <p className="text-[14px] font-bold text-white">Finding optimal match...</p>
+                  <p className="text-[12px] text-ryzo-text-secondary mt-0.5">
+                    AI analyzing route overlap + ArmorIQ validating
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Order pings */}
+        <div className="flex flex-col gap-3">
+          <AnimatePresence>
+            {pings.map((ping) => (
+              <OrderPingCard
+                key={ping.id}
+                ping={ping}
+                onAccept={() => handleAccept(ping)}
+                onDecline={() => handleDecline(ping.id)}
+              />
+            ))}
+          </AnimatePresence>
+        </div>
+
+        {/* Agent Log */}
+        <AgentDecisionLog />
+
+        {/* SpacetimeDB connection indicator */}
+        <div className="mt-4 mb-2 flex items-center gap-2">
+          <span
+            className={cn(
+              'w-2 h-2 rounded-full',
+              stdbConnected ? 'bg-ryzo-success' : 'bg-ryzo-text-disabled'
+            )}
+          />
+          <span className="text-[11px] text-ryzo-text-muted">
+            {stdbConnected ? 'SpacetimeDB Connected' : 'SpacetimeDB Offline'}
+          </span>
+        </div>
+      </div>
+
+      {/* Bottom nav */}
+      <BottomNav />
+    </div>
+  );
+}

@@ -1,0 +1,181 @@
+@import "tailwindcss";
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   RYZO Design Tokens — Tailwind v4 @theme
+   All colors, fonts, animations from BRAND.md
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+@theme inline {
+  /* ── Font ── */
+  --font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont, sans-serif;
+
+  /* ── Base Palette ── */
+  --color-ryzo-black: #000000;
+  --color-ryzo-surface-1: #111111;
+  --color-ryzo-surface-2: #1A1A1A;
+  --color-ryzo-surface-3: #0D0D0D;
+  --color-ryzo-border: #2A2A2A;
+  --color-ryzo-border-subtle: #1E1E1E;
+
+  /* ── Text ── */
+  --color-ryzo-text-primary: #FFFFFF;
+  --color-ryzo-text-secondary: #888888;
+  --color-ryzo-text-muted: #555555;
+  --color-ryzo-text-disabled: #333333;
+
+  /* ── Accent (Orange) — Use sparingly per Orange Rule ── */
+  --color-ryzo-orange: #FC8019;
+  --color-ryzo-orange-hover: #E8720A;
+  --color-ryzo-orange-dim: rgba(252, 128, 25, 0.1);
+  --color-ryzo-orange-glow: rgba(252, 128, 25, 0.25);
+
+  /* ── Status ── */
+  --color-ryzo-success: #22C55E;
+  --color-ryzo-success-dim: rgba(34, 197, 94, 0.1);
+  --color-ryzo-success-glow: rgba(34, 197, 94, 0.15);
+  --color-ryzo-error: #EF4444;
+
+  /* ── Clone Brand Colors ── */
+  --color-zomato-red: #E23744;
+  --color-rapido-blue: #1A6FE8;
+  --color-blinkit-yellow: #F9D100;
+  --color-zepto-purple: #9B59B6;
+  --color-dunzo-green: #00B140;
+  --color-porter-navy: #1C2951;
+
+  /* ── Custom Sizing ── */
+  --spacing-13: 3.25rem;
+
+  /* ── Animations ── */
+  --animate-pulse-orange: pulse-orange 1.5s ease-in-out infinite;
+  --animate-waveform: waveform 0.8s ease-in-out infinite;
+  --animate-slide-up: slide-up 300ms ease-out;
+  --animate-fade-in: fade-in 250ms ease-out;
+  --animate-slide-down: slide-down 300ms ease-out;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CSS Custom Properties (non-Tailwind)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+:root {
+  --ryzo-black: #000000;
+  --ryzo-surface-1: #111111;
+  --ryzo-surface-2: #1A1A1A;
+  --ryzo-surface-3: #0D0D0D;
+  --ryzo-border: #2A2A2A;
+  --ryzo-border-subtle: #1E1E1E;
+  --ryzo-text-primary: #FFFFFF;
+  --ryzo-text-secondary: #888888;
+  --ryzo-text-muted: #555555;
+  --ryzo-text-disabled: #333333;
+  --ryzo-orange: #FC8019;
+  --ryzo-orange-hover: #E8720A;
+  --ryzo-orange-dim: rgba(252, 128, 25, 0.1);
+  --ryzo-orange-glow: rgba(252, 128, 25, 0.25);
+  --ryzo-success: #22C55E;
+  --ryzo-success-dim: rgba(34, 197, 94, 0.1);
+  --ryzo-success-glow: rgba(34, 197, 94, 0.15);
+  --ryzo-error: #EF4444;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Base Styles
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  background: #000000;
+  color: #FFFFFF;
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Keyframes
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Orange pulse glow — unified order card border */
+@keyframes pulse-orange {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(252, 128, 25, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(252, 128, 25, 0.5);
+  }
+}
+
+/* ElevenLabs waveform bars */
+@keyframes waveform {
+  0%, 100% {
+    height: 8px;
+  }
+  50% {
+    height: 24px;
+  }
+}
+
+/* Bottom sheets, banners slide up */
+@keyframes slide-up {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Screen transitions fade in */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Toast slide from top */
+@keyframes slide-down {
+  from {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Utility Classes
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+/* Tabular numbers for money/distance/time values */
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Hide scrollbar but keep scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tap state for all interactive elements */
+.tap-scale {
+  transition: transform 100ms ease;
+}
+.tap-scale:active {
+  transform: scale(0.97);
+}

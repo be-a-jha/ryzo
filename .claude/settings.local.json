@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm -v)",
+      "Bash(npx create-next-app@latest frontend --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --no-turbopack --yes)",
+      "Bash(npm install:*)",
+      "Bash(mkdir -p frontend/src/components/ryzo frontend/src/components/zomato-clone frontend/src/components/rapido-clone frontend/src/components/shared frontend/src/lib frontend/src/hooks frontend/src/store frontend/src/types frontend/src/styles)",
+      "Bash(mkdir -p backend/src/routes backend/src/controllers backend/src/models backend/src/services backend/src/middleware backend/src/agents backend/src/utils backend/src/config)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(taskkill /F /PID 74064)",
+      "Bash(wmic process:*)",
+      "Bash(PORT=3001 timeout 12 npx next dev -p 3001)",
+      "Bash(taskkill /PID 74064 /F)",
+      "Bash(cmd //c \"taskkill /PID 74064 /F\")",
+      "Bash(npx next:*)",
+      "Bash(npx tsc:*)"
+    ]
+  }
+}

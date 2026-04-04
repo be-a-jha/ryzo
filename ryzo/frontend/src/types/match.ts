@@ -2,7 +2,7 @@ import type { OrderStop } from './order';
 
 export interface ComparisonRow {
   metric: string;
-  swiggyOnly: string;
+  zomatoOnly: string;
   rapidoOnly: string;
   ryzoAI: string;
 }
@@ -22,7 +22,7 @@ export interface MatchData {
   overlapScore: number;
   detourPercent: number;
   combinedEarnings: number;
-  individualEarnings: { swiggy: number; rapido: number };
+  individualEarnings: { zomato: number; rapido: number };
   distanceSaved: number;
   explanation: string;
   optimalSequence: string[];

@@ -11,7 +11,7 @@ interface MapViewProps {
   riderPosition?: { lat: number; lng: number };
   stops?: OrderStop[];
   routes?: {
-    swiggyOnly?: google.maps.LatLngLiteral[];
+    zomatoOnly?: google.maps.LatLngLiteral[];
     rapidoOnly?: google.maps.LatLngLiteral[];
     ryzoOptimized?: google.maps.LatLngLiteral[];
   };
@@ -117,12 +117,12 @@ export default function MapView({ variant, riderPosition, stops, routes }: MapVi
       >
         {variant === 'comparison' && (
           <>
-            {/* Swiggy route - blue dashed */}
-            {actualRoutes.swiggyOnly && (
+            {/* Zomato route - red dashed */}
+            {actualRoutes.zomatoOnly && (
               <Polyline
-                path={getAnimatedPath(actualRoutes.swiggyOnly)}
+                path={getAnimatedPath(actualRoutes.zomatoOnly)}
                 options={{
-                  strokeColor: '#3B82F6',
+                  strokeColor: '#E23744',
                   strokeOpacity: 0.7,
                   strokeWeight: 2,
                   geodesic: true,
@@ -366,8 +366,8 @@ export default function MapView({ variant, riderPosition, stops, routes }: MapVi
           className="absolute bottom-2 right-2 flex gap-3 bg-black/60 px-2 py-1 rounded-lg backdrop-blur-sm"
         >
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-[#3B82F6]" />
-            <span className="text-[10px] text-ryzo-text-secondary">Swiggy</span>
+            <div className="w-2 h-2 rounded-full bg-[#E23744]" />
+            <span className="text-[10px] text-ryzo-text-secondary">Zomato</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-full bg-[#EF4444]" />

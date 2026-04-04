@@ -102,6 +102,74 @@ export function useOrderStatuses() {
   return statuses;
 }
 
+/** Hook: Check if both Zomato and Rapido orders exist, trigger match */
+export function useMatchTrigger() {
+  const orderStatuses = useOrderStatuses();
+
+  useEffect(() => {
+    // Find pending orders
+    const zomatoOrder = orderStatuses.find((o) => 
+      String(o.platform).toLowerCase() === 'zomato' &&
+      String(o.status) === 'pending'
+    );
+    
+    const rapidoOrder = orderStatuses.find((o) => 
+      String(o.platform).toLowerCase() === 'rapido' &&
+      String(o.status) === 'pending'
+    );
+
+    // If both exist, trigger match
+    if (zomatoOrder && rapidoOrder) {
+      console.log('[useMatchTrigger] Both pending orders found! Triggering match...');
+      
+      import('@/store/matchingStore').then(async ({ useMatchingStore }) => {
+        const store = useMatchingStore.getState();
+        
+        store.setMatchStatus('searching');
+        
+        // Create match after 1.5s
+        setTimeout(async () => {
+          const { generateMatchId, pushMatchToSpacetime } = await import('@/services/spacetimeService');
+          const { MOCK_MATCH_DATA, MOCK_AGENT_LOG, MOCK_UNIFIED_PING } = await import('@/lib/mockData');
+          const { useRiderStore } = await import('@/store/riderStore');
+          const { useRyzoStore } = await import('@/store/ryzoStore');
+          
+          const matchId = generateMatchId();
+          const riderId = '679f1234567890abcdef1234';
+          const zomatoId = String(zomatoOrder.orderId);
+          const rapidoId = String(rapidoOrder.orderId);
+          
+          // Push match to SpacetimeDB
+          await pushMatchToSpacetime({
+            matchId,
+            riderId,
+            order1Id: zomatoId,
+            order2Id: rapidoId,
+            combinedEarnings: 142,
+            overlapScore: 84,
+          });
+          
+          // Update local state
+          store.setMatchStatus('matched');
+          store.setMatchData(MOCK_MATCH_DATA);
+          store.setAgentLog(MOCK_AGENT_LOG);
+          
+          // Add ping to rider store
+          useRiderStore.getState().addPing(MOCK_UNIFIED_PING);
+          
+          // Show popup if on dashboard
+          const ryzoScreen = useRyzoStore.getState().currentScreen;
+          if (ryzoScreen === 8) {
+            store.showRiderPopup();
+          } else {
+            useMatchingStore.setState({ pendingRiderAlert: true });
+          }
+        }, 1500);
+      });
+    }
+  }, [orderStatuses]);
+}
+
 /** Hook: agent decisions from SpacetimeDB */
 export function useAgentDecisions() {
   const [decisions, setDecisions] = useState<Array<Record<string, unknown>>>([]);

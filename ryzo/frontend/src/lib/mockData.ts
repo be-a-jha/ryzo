@@ -120,7 +120,7 @@ export const MOCK_RIDER_PROFILE: RiderProfile = {
 export const MOCK_UNIFIED_PING: OrderPing = {
   id: 'ping-unified-1',
   type: 'unified',
-  platforms: ['SWIGGY', 'RAPIDO'],
+  platforms: ['ZOMATO', 'RAPIDO'],
   badge: 'UNIFIED ORDER',
   restaurant: "McDonald's, Arera Colony",
   dropAddress: 'Hoshangabad Rd, BHEL',
@@ -138,7 +138,7 @@ export const MOCK_UNIFIED_PING: OrderPing = {
 export const MOCK_STANDARD_PING: OrderPing = {
   id: 'ping-standard-1',
   type: 'standard',
-  platforms: ['SWIGGY'],
+  platforms: ['ZOMATO'],
   restaurant: 'Burger King, MP Nagar',
   dropAddress: 'Tulsi Nagar, Bhopal',
   distance: '2.8 km',
@@ -198,10 +198,10 @@ export const RAPIDO_RIDE_TYPES = [
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export const COMPARISON_DATA: ComparisonRow[] = [
-  { metric: 'Distance', swiggyOnly: '5.1 km', rapidoOnly: '4.8 km', ryzoAI: '3.9 km' },
-  { metric: 'Earnings', swiggyOnly: '₹52', rapidoOnly: '₹48', ryzoAI: '₹94' },
-  { metric: 'Time Est.', swiggyOnly: '22 min', rapidoOnly: '20 min', ryzoAI: '17 min' },
-  { metric: 'Fuel Est.', swiggyOnly: '₹18', rapidoOnly: '₹16', ryzoAI: '₹13' },
+  { metric: 'Distance', zomatoOnly: '5.1 km', rapidoOnly: '4.8 km', ryzoAI: '3.9 km' },
+  { metric: 'Earnings', zomatoOnly: '₹52', rapidoOnly: '₹48', ryzoAI: '₹94' },
+  { metric: 'Time Est.', zomatoOnly: '22 min', rapidoOnly: '20 min', ryzoAI: '17 min' },
+  { metric: 'Fuel Est.', zomatoOnly: '₹18', rapidoOnly: '₹16', ryzoAI: '₹13' },
 ];
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -289,7 +289,7 @@ export const MOCK_MATCH_DATA: MatchData = {
   overlapScore: 84,
   detourPercent: 12,
   combinedEarnings: 94,
-  individualEarnings: { swiggy: 52, rapido: 48 },
+  individualEarnings: { zomato: 52, rapido: 48 },
   distanceSaved: 1.2,
   explanation: AI_INSIGHT_TEXT,
   optimalSequence: ["McDonald's Pickup", 'BHEL Drop', 'MP Nagar Pickup', 'Sarvadharm Drop'],

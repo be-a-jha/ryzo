@@ -105,7 +105,7 @@ export const defaultMapOptions: google.maps.MapOptions = {
 
 // Mock route coordinates for Bhopal demo
 export const MOCK_ROUTES = {
-  swiggyOnly: [
+  zomatoOnly: [
     { lat: 23.2599, lng: 77.4126 }, // McDonald's
     { lat: 23.2450, lng: 77.4300 },
     { lat: 23.2350, lng: 77.4450 },

@@ -3,6 +3,7 @@ import type { MatchData, MatchStatus, AgentDecisionEntry } from '@/types/match';
 import { MOCK_MATCH_DATA, MOCK_AGENT_LOG, MOCK_UNIFIED_PING } from '@/lib/mockData';
 import { useRiderStore } from '@/store/riderStore';
 import { useRyzoStore } from '@/store/ryzoStore';
+import { pushOrderToSpacetime, pushMatchToSpacetime, generateOrderId, generateMatchId } from '@/services/spacetimeService';
 
 interface MatchingState {
   /** Current matching status */
@@ -100,12 +101,26 @@ function playNotificationSound(): void {
 export const useMatchingStore = create<MatchingState>((set, get) => ({
   ...initialState,
 
-  triggerMatch: (source) => {
+  triggerMatch: async (source) => {
     const state = get();
 
     if (source === 'zomato') {
       // Already triggered? Ignore
       if (state.zomatoFlexibleTriggered) return;
+
+      const orderId = generateOrderId('zomato');
+
+      // Push to SpacetimeDB for cross-device sync
+      await pushOrderToSpacetime({
+        orderId,
+        platform: 'zomato',
+        type: 'food',
+        status: 'pending',
+        pickup: { lat: 23.2599, lng: 77.4126, address: "McDonald's, Arera Colony" },
+        drop: { lat: 23.2156, lng: 77.4395, address: 'BHEL Sector' },
+        fare: 78,
+        timestamp: Date.now(),
+      });
 
       set({
         zomatoFlexibleTriggered: true,
@@ -117,13 +132,25 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
         set({ zomatoNotification: null });
       }, 4000);
 
-      // Check if rapido was already triggered → fire match
-      if (state.rapidoFlexibleTriggered) {
-        fireBothMatched(set, get);
-      }
+      // IMPORTANT: Don't check local state - SpacetimeDB will trigger match
+      console.log('[MatchingStore] Zomato order pushed to SpacetimeDB');
     } else {
       // rapido
       if (state.rapidoFlexibleTriggered) return;
+
+      const orderId = generateOrderId('rapido');
+
+      // Push to SpacetimeDB for cross-device sync
+      await pushOrderToSpacetime({
+        orderId,
+        platform: 'rapido',
+        type: 'ride',
+        status: 'pending',
+        pickup: { lat: 23.2400, lng: 77.4500, address: 'MP Nagar' },
+        drop: { lat: 23.2100, lng: 77.4200, address: 'Sarvadharm' },
+        fare: 92,
+        timestamp: Date.now(),
+      });
 
       set({
         rapidoFlexibleTriggered: true,
@@ -134,10 +161,8 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
         set({ rapidoNotification: null });
       }, 4000);
 
-      // Check if zomato was already triggered → fire match
-      if (state.zomatoFlexibleTriggered) {
-        fireBothMatched(set, get);
-      }
+      // IMPORTANT: Don't check local state - SpacetimeDB will trigger match
+      console.log('[MatchingStore] Rapido order pushed to SpacetimeDB');
     }
   },
 
@@ -178,11 +203,36 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
     }
   },
 
-  acceptMatch: () => {
+  acceptMatch: async () => {
     set({
       matchStatus: 'accepted',
       riderPopupVisible: false,
     });
+
+    // Mark orders as completed in SpacetimeDB
+    const { getSpacetimeConnection } = await import('@/lib/spacetimedb');
+    const conn = getSpacetimeConnection();
+    if (conn) {
+      try {
+        // Get all pending orders and mark as completed
+        const orders = [...conn.db.orderStatus.iter()];
+        for (const order of orders) {
+          if (String((order as Record<string, unknown>).status) === 'pending') {
+            await conn.reducers.updateOrderStatus({
+              orderId: String((order as Record<string, unknown>).orderId),
+              status: 'completed',
+              discountApplied: BigInt(0),
+              platform: String((order as Record<string, unknown>).platform),
+              savingsMessage: 'Match accepted',
+              timestamp: BigInt(Date.now()),
+            });
+          }
+        }
+        console.log('[MatchingStore] Orders marked as completed');
+      } catch (error) {
+        console.error('[MatchingStore] Failed to update orders:', error);
+      }
+    }
 
     // Show confirmations on both phones
     set({
@@ -200,9 +250,45 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
 
     // Navigate rider to order detail
     useRyzoStore.getState().navigateTo(9);
+
+    // Reset match status after 2s to allow new matches
+    setTimeout(() => {
+      set({ 
+        matchStatus: 'idle',
+        matchData: null,
+        zomatoFlexibleTriggered: false,
+        rapidoFlexibleTriggered: false,
+      });
+    }, 2000);
   },
 
-  declineMatch: () => {
+  declineMatch: async () => {
+    // Mark orders as completed in SpacetimeDB FIRST
+    const { getSpacetimeConnection } = await import('@/lib/spacetimedb');
+    const conn = getSpacetimeConnection();
+    if (conn) {
+      try {
+        // Get all pending orders and mark as completed
+        const orders = [...conn.db.orderStatus.iter()];
+        for (const order of orders) {
+          if (String((order as Record<string, unknown>).status) === 'pending') {
+            await conn.reducers.updateOrderStatus({
+              orderId: String((order as Record<string, unknown>).orderId),
+              status: 'completed',
+              discountApplied: BigInt(0),
+              platform: String((order as Record<string, unknown>).platform),
+              savingsMessage: 'Match declined',
+              timestamp: BigInt(Date.now()),
+            });
+          }
+        }
+        console.log('[MatchingStore] Orders marked as completed');
+      } catch (error) {
+        console.error('[MatchingStore] Failed to update orders:', error);
+      }
+    }
+
+    // Reset state
     set({
       matchStatus: 'idle',
       matchData: null,
@@ -244,6 +330,19 @@ function fireBothMatched(
 
   // Phase 2: after 1.5s delay (simulates AI + ArmorIQ processing), show match result
   setTimeout(() => {
+    const matchId = generateMatchId();
+    const riderId = '679f1234567890abcdef1234'; // Demo rider ID
+
+    // Push match to SpacetimeDB for cross-device sync
+    pushMatchToSpacetime({
+      matchId,
+      riderId,
+      order1Id: 'zomato_order',
+      order2Id: 'rapido_order',
+      combinedEarnings: 142,
+      overlapScore: 84,
+    });
+
     set({
       matchStatus: 'matched',
       matchData: MOCK_MATCH_DATA,

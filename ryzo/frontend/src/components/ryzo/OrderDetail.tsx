@@ -35,7 +35,7 @@ function ComparisonTable() {
         >
           <div className="flex-1 px-3 py-2.5 text-[12px] text-ryzo-text-secondary">{row.metric}</div>
           <div className="flex-1 px-3 py-2.5 text-[13px] text-ryzo-text-secondary text-center tabular-nums">
-            {row.swiggyOnly}
+            {row.zomatoOnly}
           </div>
           <div className="flex-1 px-3 py-2.5 text-[13px] text-ryzo-text-secondary text-center tabular-nums">
             {row.rapidoOnly}

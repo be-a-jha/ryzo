@@ -6,6 +6,7 @@ import { Home, Map, DollarSign, User, ChevronDown, ChevronUp, X } from 'lucide-r
 import { useRyzoStore } from '@/store/ryzoStore';
 import { useRiderStore } from '@/store/riderStore';
 import { useMatchingStore } from '@/store/matchingStore';
+import { useActiveMatches } from '@/hooks/useSpacetimeDB';
 import {
   MOCK_STANDARD_PING,
   MOCK_AGENT_LOG,
@@ -130,7 +131,7 @@ function OrderPingCard({ ping, onAccept, onDecline }: {
   const seconds = timer % 60;
 
   const platformColors: Record<string, string> = {
-    SWIGGY: '#FC8019',
+    ZOMATO: '#E23744',
     RAPIDO: '#1A6FE8',
   };
 
@@ -396,9 +397,41 @@ function MatchPopup() {
 
 // ── Main Component ──
 
+/** Play a short notification beep using Web Audio API */
+function playNotificationSound(): void {
+  try {
+    const ctx = new AudioContext();
+    const oscillator = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    // Two-tone notification: ascending beep
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(587, ctx.currentTime); // D5
+    oscillator.frequency.setValueAtTime(784, ctx.currentTime + 0.12); // G5
+    oscillator.frequency.setValueAtTime(988, ctx.currentTime + 0.24); // B5
+
+    gainNode.gain.setValueAtTime(0.3, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+
+    oscillator.start(ctx.currentTime);
+    oscillator.stop(ctx.currentTime + 0.5);
+
+    // Clean up
+    oscillator.onended = () => {
+      ctx.close();
+    };
+  } catch {
+    // Audio not available — silent fail
+  }
+}
+
 export default function RiderDashboard() {
   const navigateTo = useRyzoStore((s) => s.navigateTo);
   const setMatchData = useMatchingStore((s) => s.setMatchData);
+  const setMatchStatus = useMatchingStore((s) => s.setMatchStatus);
   const matchStatus = useMatchingStore((s) => s.matchStatus);
   const showRiderPopup = useMatchingStore((s) => s.showRiderPopup);
   const removePing = useRiderStore((s) => s.removePing);
@@ -414,6 +447,27 @@ export default function RiderDashboard() {
   // Standard pings (non-unified) - use backend data if available, fallback to mock
   const [pings] = useState<OrderPing[]>([MOCK_STANDARD_PING]);
   const displayPings = incomingPings.length > 0 ? incomingPings : pings;
+
+  // Subscribe to SpacetimeDB matches for cross-device sync
+  const spacetimeMatches = useActiveMatches();
+
+  // When new match arrives from SpacetimeDB, show popup
+  useEffect(() => {
+    if (spacetimeMatches.length > 0) {
+      const latestMatch = spacetimeMatches[0];
+      console.log('[RiderDashboard] Match from SpacetimeDB:', latestMatch);
+      
+      // Set match data
+      setMatchData(MOCK_MATCH_DATA);
+      setMatchStatus('matched');
+      
+      // Show popup if on dashboard
+      showRiderPopup();
+      
+      // Play sound
+      playNotificationSound();
+    }
+  }, [spacetimeMatches, setMatchData, setMatchStatus, showRiderPopup]);
 
   // Fetch real data from backend on mount
   useEffect(() => {

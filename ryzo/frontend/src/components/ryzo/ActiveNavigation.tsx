@@ -6,21 +6,55 @@ import { useRyzoStore } from '@/store/ryzoStore';
 import { useRiderStore } from '@/store/riderStore';
 import { MOCK_NAVIGATION_STOPS, VOICE_SCRIPTS } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import type { OrderStop } from '@/types/order';
 import MapView from '@/components/shared/MapView';
+import api from '@/lib/api';
 
-// ── Voice engine — browser SpeechSynthesis, zero backend dependency ──
+// ── Voice engine — ElevenLabs via backend, SpeechSynthesis fallback ──
 
-function useBrowserVoice() {
+function useVoiceEngine() {
   const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [usingElevenLabs, setUsingElevenLabs] = useState(false);
 
-  const speak = useCallback((text: string) => {
+  /** Try ElevenLabs backend first, fall back to browser SpeechSynthesis */
+  const speak = useCallback(async (text: string, type: 'match' | 'navigation' | 'arrival' | 'fallback' = 'navigation') => {
     if (typeof window === 'undefined') return;
 
-    // Cancel any current speech
+    // Cancel any current playback
     window.speechSynthesis?.cancel();
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
 
+    // Try ElevenLabs via backend
+    try {
+      const response = await api.post('/api/voice/generate', { type, text }, {
+        responseType: 'arraybuffer',
+        timeout: 4000,
+      });
+
+      // Check if we got audio back (not JSON fallback)
+      const contentType = response.headers['content-type'];
+      if (contentType && contentType.includes('audio')) {
+        const blob = new Blob([response.data], { type: 'audio/mpeg' });
+        const url = URL.createObjectURL(blob);
+        const audio = new Audio(url);
+        audioRef.current = audio;
+        setUsingElevenLabs(true);
+        audio.onended = () => { URL.revokeObjectURL(url); audioRef.current = null; };
+        audio.onerror = () => { URL.revokeObjectURL(url); audioRef.current = null; };
+        await audio.play();
+        return;
+      }
+    } catch {
+      // ElevenLabs unavailable — fall through to SpeechSynthesis
+    }
+
+    // Fallback: browser SpeechSynthesis
+    setUsingElevenLabs(false);
     if (!('speechSynthesis' in window)) return;
 
     const utterance = new SpeechSynthesisUtterance(text);
@@ -28,14 +62,11 @@ function useBrowserVoice() {
     utterance.pitch = 1.0;
     utterance.volume = 1.0;
 
-    // Try to pick a good English voice
     const voices = window.speechSynthesis.getVoices();
     const preferred = voices.find(
       (v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('google'),
     ) || voices.find((v) => v.lang.startsWith('en-'));
-    if (preferred) {
-      utterance.voice = preferred;
-    }
+    if (preferred) utterance.voice = preferred;
 
     utteranceRef.current = utterance;
     window.speechSynthesis.speak(utterance);
@@ -44,9 +75,13 @@ function useBrowserVoice() {
   const stop = useCallback(() => {
     window.speechSynthesis?.cancel();
     utteranceRef.current = null;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
   }, []);
 
-  return { speak, stop };
+  return { speak, stop, usingElevenLabs };
 }
 
 // ── Waveform bars ──
@@ -197,7 +232,7 @@ export default function ActiveNavigation() {
   const setVoiceInstruction = useRiderStore((s) => s.setVoiceInstruction);
   const currentStopIndex = useRiderStore((s) => s.currentStopIndex);
 
-  const { speak, stop: stopSpeech } = useBrowserVoice();
+  const { speak, stop: stopSpeech } = useVoiceEngine();
   const mutedRef = useRef(false);
   const hasMountedRef = useRef(false);
 

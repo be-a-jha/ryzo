@@ -144,6 +144,12 @@ export const useRiderStore = create<RiderState>((set, get) => ({
 
   addPing: (ping) => {
     const { incomingPings } = get();
+    // Check if ping already exists
+    const exists = incomingPings.some((p) => p.id === ping.id);
+    if (exists) {
+      console.log('[RiderStore] Ping already exists, skipping:', ping.id);
+      return;
+    }
     set({ incomingPings: [...incomingPings, ping] });
   },
 
@@ -156,17 +162,19 @@ export const useRiderStore = create<RiderState>((set, get) => ({
 
   advanceStop: () => {
     const { currentStopIndex, navigationStops } = get();
-    if (currentStopIndex < navigationStops.length - 1) {
-      const updatedStops = navigationStops.map((stop, i) => {
-        if (i === currentStopIndex) return { ...stop, status: 'done' as const };
-        if (i === currentStopIndex + 1) return { ...stop, status: 'current' as const };
-        return stop;
-      });
-      set({
-        currentStopIndex: currentStopIndex + 1,
-        navigationStops: updatedStops,
-      });
-    }
+    if (currentStopIndex >= navigationStops.length) return; // Already past all stops
+
+    const isLastStop = currentStopIndex === navigationStops.length - 1;
+    const updatedStops = navigationStops.map((stop, i) => {
+      if (i === currentStopIndex) return { ...stop, status: 'done' as const };
+      if (!isLastStop && i === currentStopIndex + 1) return { ...stop, status: 'current' as const };
+      return stop;
+    });
+
+    set({
+      currentStopIndex: isLastStop ? currentStopIndex : currentStopIndex + 1,
+      navigationStops: updatedStops,
+    });
   },
 
   setVoiceActive: (active) => set({ voiceActive: active }),

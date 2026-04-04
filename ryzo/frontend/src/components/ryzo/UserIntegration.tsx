@@ -113,6 +113,13 @@ export default function UserIntegration() {
         <motion.button
           whileTap={hasIntegrated ? { scale: 0.97 } : undefined}
           disabled={!hasIntegrated}
+          onClick={() => {
+            if (hasIntegrated) {
+              // User-side integration complete — for now navigate back to role selection
+              // In a full app this would go to a user dashboard
+              goBack();
+            }
+          }}
           className={cn(
             'w-full h-13 rounded-xl text-[15px] font-medium transition-colors',
             hasIntegrated

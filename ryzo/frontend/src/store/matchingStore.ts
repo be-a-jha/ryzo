@@ -19,6 +19,10 @@ interface MatchingState {
   zomatoNotification: string | null;
   /** Notification message for Rapido phone */
   rapidoNotification: string | null;
+  /** Whether Zomato order is completed */
+  zomatoCompleted: boolean;
+  /** Whether Rapido order is completed */
+  rapidoCompleted: boolean;
   /** Whether the rider popup is showing */
   riderPopupVisible: boolean;
   /** Match is ready but rider hasn't reached Screen 8 yet — queued */
@@ -38,6 +42,8 @@ interface MatchingState {
   setAgentLog: (log: AgentDecisionEntry[]) => void;
   /** Dismiss a notification */
   dismissNotification: (phone: 'zomato' | 'rapido') => void;
+  /** Mark order as completed */
+  completeOrder: (phone: 'zomato' | 'rapido') => void;
   /** Accept the match from rider popup */
   acceptMatch: () => void;
   /** Decline the match from rider popup */
@@ -54,6 +60,8 @@ const initialState = {
   rapidoFlexibleTriggered: false,
   zomatoNotification: null as string | null,
   rapidoNotification: null as string | null,
+  zomatoCompleted: false,
+  rapidoCompleted: false,
   riderPopupVisible: false,
   pendingRiderAlert: false,
 };
@@ -150,6 +158,14 @@ export const useMatchingStore = create<MatchingState>((set, get) => ({
       set({ zomatoNotification: null });
     } else {
       set({ rapidoNotification: null });
+    }
+  },
+
+  completeOrder: (phone) => {
+    if (phone === 'zomato') {
+      set({ zomatoCompleted: true });
+    } else {
+      set({ rapidoCompleted: true });
     }
   },
 

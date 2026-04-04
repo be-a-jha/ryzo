@@ -1,7 +1,13 @@
 import { Router } from 'express';
-import { getNearbyRiders, updateRiderLocation, updateRiderStatus } from '../controllers/riderController';
+import { getNearbyRiders, updateRiderLocation, updateRiderStatus, getRiderProfile, getRiderOrders } from '../controllers/riderController';
 
 const router = Router();
+
+// GET /api/riders/:id — Get rider profile
+router.get('/:id', getRiderProfile);
+
+// GET /api/riders/:id/orders — Get rider's active orders/pings
+router.get('/:id/orders', getRiderOrders);
 
 // GET /api/riders/nearby?lat=X&lng=Y&radiusKm=Z — Find nearby riders
 router.get('/nearby', getNearbyRiders);

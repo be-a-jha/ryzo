@@ -403,10 +403,26 @@ export default function RiderDashboard() {
   const showRiderPopup = useMatchingStore((s) => s.showRiderPopup);
   const removePing = useRiderStore((s) => s.removePing);
   const profile = useRiderStore((s) => s.profile);
+  const riderId = useRiderStore((s) => s.riderId);
+  const loading = useRiderStore((s) => s.loading);
+  const error = useRiderStore((s) => s.error);
+  const fetchProfile = useRiderStore((s) => s.fetchProfile);
+  const fetchOrders = useRiderStore((s) => s.fetchOrders);
+  const incomingPings = useRiderStore((s) => s.incomingPings);
   const stdbConnected = useSpacetimeStatus();
 
-  // Standard pings (non-unified) always visible as baseline
+  // Standard pings (non-unified) - use backend data if available, fallback to mock
   const [pings] = useState<OrderPing[]>([MOCK_STANDARD_PING]);
+  const displayPings = incomingPings.length > 0 ? incomingPings : pings;
+
+  // Fetch real data from backend on mount
+  useEffect(() => {
+    const storedRiderId = riderId || localStorage.getItem('ryzo_rider_id');
+    if (storedRiderId) {
+      fetchProfile(storedRiderId);
+      fetchOrders(storedRiderId);
+    }
+  }, [riderId, fetchProfile, fetchOrders]);
 
   // When rider reaches this screen, activate any pending match popup + sound
   useEffect(() => {
@@ -430,6 +446,21 @@ export default function RiderDashboard() {
     <div className="flex flex-col h-full bg-ryzo-black relative">
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto scrollbar-hide px-4 pt-3 pb-4">
+        {/* Loading state */}
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-8 h-8 border-2 border-ryzo-orange border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
+
+        {/* Error state */}
+        {error && (
+          <div className="bg-ryzo-surface-1 border border-ryzo-error rounded-2xl p-4 mb-4">
+            <p className="text-[14px] text-ryzo-error">{error}</p>
+            <p className="text-[12px] text-ryzo-text-secondary mt-1">Using demo data as fallback</p>
+          </div>
+        )}
+
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-[18px] font-bold text-white">
@@ -481,7 +512,7 @@ export default function RiderDashboard() {
         {/* Standard order pings (always visible) */}
         <div className="flex flex-col gap-3">
           <AnimatePresence>
-            {pings.map((ping) => (
+            {displayPings.map((ping) => (
               <OrderPingCard
                 key={ping.id}
                 ping={ping}

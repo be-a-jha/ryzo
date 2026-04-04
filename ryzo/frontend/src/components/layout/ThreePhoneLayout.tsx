@@ -45,11 +45,6 @@ export default function ThreePhoneLayout({
     <div className="min-h-screen w-full bg-ryzo-black flex flex-col items-center justify-center px-4 py-8">
       {/* RYZO branding header */}
       <div className="mb-8 text-center">
-        <div className="inline-block px-3 py-1 rounded-full bg-ryzo-surface-1 border border-ryzo-border mb-3">
-          <span className="text-[10px] font-bold uppercase tracking-[3px] text-ryzo-text-muted">
-            HackByte 4.0 — IIITDM Jabalpur
-          </span>
-        </div>
         <h1 className="text-[28px] font-bold text-white tracking-[8px]">
           RY
           <span className="relative">
@@ -136,7 +131,7 @@ export default function ThreePhoneLayout({
       </div>
 
       {/* Tech stack footer */}
-      <motion.div
+      {/* <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.2 }}
@@ -161,7 +156,7 @@ export default function ThreePhoneLayout({
             {tech.label}
           </span>
         ))}
-      </motion.div>
+      </motion.div> */}
     </div>
   );
 }

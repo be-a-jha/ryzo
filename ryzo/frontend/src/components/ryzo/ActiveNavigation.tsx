@@ -2,6 +2,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, VolumeX } from 'lucide-react';
+import { useRyzoStore } from '@/store/ryzoStore';
 import { useRiderStore } from '@/store/riderStore';
 import { MOCK_NAVIGATION_STOPS, VOICE_SCRIPTS } from '@/lib/mockData';
 import { cn } from '@/lib/utils';
@@ -188,6 +189,7 @@ function StopsStepper({ stops }: { stops: OrderStop[] }) {
 // ── Main Component ──
 
 export default function ActiveNavigation() {
+  const navigateTo = useRyzoStore((s) => s.navigateTo);
   const navigationStops = useRiderStore((s) => s.navigationStops);
   const advanceStop = useRiderStore((s) => s.advanceStop);
   const setNavigationStops = useRiderStore((s) => s.setNavigationStops);
@@ -256,6 +258,9 @@ export default function ActiveNavigation() {
   }, [allDone, setVoiceInstruction, setVoiceActive, speak]);
 
   const handleMarkDelivered = () => {
+    // Check if this is the last stop
+    const isLastStop = currentStopIndex >= stops.length - 1;
+    
     // Speak arrival script before advancing
     const arrivalScript = VOICE_SCRIPTS.stopArrival[currentStopIndex];
     if (arrivalScript && !mutedRef.current) {
@@ -265,6 +270,13 @@ export default function ActiveNavigation() {
     // Advance after a tiny delay so arrival audio starts
     setTimeout(() => {
       advanceStop();
+      
+      // If this was the last stop, navigate to completion screen
+      if (isLastStop) {
+        setTimeout(() => {
+          navigateTo(11); // Screen 11 = DeliveryComplete
+        }, 1000);
+      }
     }, 300);
   };
 

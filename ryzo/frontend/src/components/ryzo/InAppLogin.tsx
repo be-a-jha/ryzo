@@ -4,17 +4,25 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 import { useRyzoStore } from '@/store/ryzoStore';
+import { useRiderStore } from '@/store/riderStore';
 
 export default function InAppLogin() {
   const currentLoginApp = useRyzoStore((s) => s.currentLoginApp);
   const closeLoginModal = useRyzoStore((s) => s.closeLoginModal);
   const addIntegratedApp = useRyzoStore((s) => s.addIntegratedApp);
+  const setRiderId = useRiderStore((s) => s.setRiderId);
   const [showPassword, setShowPassword] = useState(false);
 
   if (!currentLoginApp) return null;
 
   const handleLogin = () => {
     addIntegratedApp(currentLoginApp.id);
+    
+    // Set demo rider ID and persist to localStorage
+    const demoRiderId = '679f1234567890abcdef1234'; // Demo rider from seed data
+    setRiderId(demoRiderId);
+    localStorage.setItem('ryzo_rider_id', demoRiderId);
+    
     closeLoginModal();
   };
 

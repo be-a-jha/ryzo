@@ -11,6 +11,7 @@ import RiderIntegration from './RiderIntegration';
 import RiderDashboard from './RiderDashboard';
 import OrderDetail from './OrderDetail';
 import ActiveNavigation from './ActiveNavigation';
+import DeliveryComplete from './DeliveryComplete';
 
 const screenComponents: Record<number, React.ComponentType> = {
   1: SplashScreen,
@@ -23,6 +24,7 @@ const screenComponents: Record<number, React.ComponentType> = {
   8: RiderDashboard,
   9: OrderDetail,
   10: ActiveNavigation,
+  11: DeliveryComplete,
 };
 
 export default function ScreenRouter() {

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { Role, PlatformApp } from '@/types/platform';
 
-type RyzoScreen = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10;
+type RyzoScreen = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
 
 interface RyzoState {
   /** Current active screen in the RYZO center phone (1-10) */

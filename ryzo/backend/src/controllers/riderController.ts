@@ -1,5 +1,45 @@
 import { Request, Response } from 'express';
 import Rider from '../models/Rider';
+import Order from '../models/Order';
+
+export const getRiderProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const rider = await Rider.findById(req.params.id);
+
+    if (!rider) {
+      res.status(404).json({ error: 'Rider not found' });
+      return;
+    }
+
+    res.status(200).json({ rider });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to fetch rider profile', details: message });
+  }
+};
+
+export const getRiderOrders = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const rider = await Rider.findById(req.params.id);
+
+    if (!rider) {
+      res.status(404).json({ error: 'Rider not found' });
+      return;
+    }
+
+    // Find orders that are matched and assigned to this rider
+    const orders = await Order.find({
+      status: { $in: ['matched', 'active'] },
+      // In a real system, we'd have a riderId field on Order
+      // For now, return orders near the rider's location
+    }).limit(10);
+
+    res.status(200).json({ orders, count: orders.length });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    res.status(500).json({ error: 'Failed to fetch rider orders', details: message });
+  }
+};
 
 export const getNearbyRiders = async (req: Request, res: Response): Promise<void> => {
   try {

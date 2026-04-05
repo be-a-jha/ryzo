@@ -141,7 +141,7 @@ export default function MapView({ variant, riderPosition, stops, routes }: MapVi
               />
             )}
 
-            {/* Rapido route - red dashed */}
+            {/* Rapido route - yellow dashed */}
             {actualRoutes.rapidoOnly && (
               <Polyline
                 path={getAnimatedPath(actualRoutes.rapidoOnly)}
@@ -370,7 +370,7 @@ export default function MapView({ variant, riderPosition, stops, routes }: MapVi
             <span className="text-[10px] text-ryzo-text-secondary">Zomato</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-2 h-2 rounded-full bg-[#EF4444]" />
+            <div className="w-2 h-2 rounded-full bg-[#fcfc03]" />
             <span className="text-[10px] text-ryzo-text-secondary">Rapido</span>
           </div>
           <div className="flex items-center gap-1">

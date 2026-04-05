@@ -146,7 +146,7 @@ export default function MapView({ variant, riderPosition, stops, routes }: MapVi
               <Polyline
                 path={getAnimatedPath(actualRoutes.rapidoOnly)}
                 options={{
-                  strokeColor: '#EF4444',
+                  strokeColor: '#fcfc03',
                   strokeOpacity: 0.7,
                   strokeWeight: 2,
                   geodesic: true,
